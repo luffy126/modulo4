@@ -354,12 +354,11 @@ int agregarSectorProyectoLey(char *sector,int opcion) {
     return 0;
 }
 int contarFirmasPersonas(struct nodoPersona *head) {
+    int contadorFirmas = 0; // arreglar
+    struct nodoPersona *rec; // arreglar
 
     if(head == NULL)
         return 0;
-
-    int contadorFirmas = 0; // arreglar
-    struct nodoPersona *rec; // arreglar
     rec = head; // se arregla lo de arriba
 
     do {
@@ -380,11 +379,9 @@ int contarFirmasPersonas(struct nodoPersona *head) {
 }
 
 int agregarProyectoPersona(struct nodoProyectoLey **proyectos,struct ProyectoLey *nuevo, struct nodoPersona *head) {
-
+    int totalFirmas; //arreglar
     if(head == NULL)
         return 0;
-
-    int totalFirmas; //arreglar
 
     totalFirmas = contarFirmasPersonas(head);
     if(totalFirmas >= minFirmas) {
@@ -1146,32 +1143,48 @@ int buscarPersonaCongreso(struct nodoParlamentario *head,char *RutBuscado) {
 
 struct Persona *datosPersona(struct Estado *es) {
     struct Persona *nueva;
-    int edad,salida=0;
-    char nombre[60],Rut[14];
+    int edad, salida = 0;
+    char nombre[60], Rut[14];
 
-    printf("Ingrese el nombre:");
-    scanf(" %[^\n]",&nombre);
+    // Solicitar el nombre
+    printf("Ingrese el nombre: ");
+    scanf(" %[^\n]", nombre);  // Se corrige la lectura sin usar & en una cadena
 
-    printf("Ingrese el Rut de la persona(Formato x.xxx.xxx-x):");
+    // Solicitar y validar el Rut
+    printf("Ingrese el Rut de la persona (Formato x.xxx.xxx-x): ");
     do {
-        scanf("%s",&Rut);
-        if(buscarPersonaCongreso(es->congreso->senadores,Rut)==0 && buscarPersonaCongreso(es->congreso->diputados,Rut)==0) {
-            salida =1;
-        }else {
-            printf("Ese Rut ya Existe");
-            printf("Ingrese 0 si quiere salir\n");
-            scanf("%s",&salida);
-            if(salida==1) {
-                return NULL;
+        scanf("%s", Rut);  // Leer el Rut
+
+        // Validar si el Rut ya existe en las listas del Congreso
+        if (buscarPersonaCongreso(es->congreso->senadores, Rut) == 0 && 
+            buscarPersonaCongreso(es->congreso->diputados, Rut) == 0) {
+            salida = 1;  // Rut es válido y no está duplicado
+        } else {
+            printf("Ese Rut ya existe. ");
+            printf("Ingrese 0 si quiere salir o cualquier número para reintentar: ");
+            scanf("%d", &salida);
+            if (salida == 0) {
+                return NULL;  // Salir si el usuario elige
             }
         }
-    }while(salida!=1);
-    printf("Ingrese la Edad:");
-    scanf("%d",&edad);
+    } while (salida != 1);
 
-    nueva = crearPersona(nombre,Rut,edad,0);
+    // Solicitar la edad
+    printf("Ingrese la Edad: ");
+    do {
+        if (scanf("%d", &edad) != 1 || edad <= 0) {
+            printf("Edad no válida. Intente de nuevo: ");
+            while (getchar() != '\n');  // Limpiar el buffer
+        } else {
+            break;
+        }
+    } while (1);
+
+    // Crear la nueva persona con los datos ingresados
+    nueva = crearPersona(nombre, Rut, edad, 0);
     return nueva;
 }
+
 
 struct Parlamentario *DatosNuevoParlamentario(struct Estado *es,struct nodoParlamentario *head,int ID) {
     int salida=0,IdParlamentario;
@@ -1386,32 +1399,42 @@ void agregarDatosParlamentario(struct Estado *es){
     } while (opcion != 1);
 }
 int eliminarCiudadano(struct nodoPersona **head, char *rut) {
-    struct nodoPersona *rec,*ant;
+    struct nodoPersona *rec;
 
+    // Verificar si la lista está vacía
     if (*head == NULL) {
         return 0;
     }
 
-    rec= *head;
+    rec = *head;
+
+    // Recorrer la lista circular
     do {
-        if (strcmp(rec->datosPersona->rut, rut) == 0) {
-            if (rec == *head && rec->sig == *head) {
-                *head = NULL;
+        if (strcmp(rec->datosPersona->rut, rut) == 0) {  // Si encontramos el nodo a eliminar
+            if (rec->sig == rec) {  // Único nodo en la lista
+                *head = NULL;  // Lista queda vacía
             } else {
-                if (rec == *head) {
-                    *head = rec->sig;
+                if (rec == *head) {  // El nodo a eliminar es el primer nodo
+                    *head = rec->sig;  // Cambiar el puntero de la cabeza
                 }
-                rec->ant->sig = rec->sig;
-                rec->sig->ant = rec->ant;
+                rec->ant->sig = rec->sig;  // Saltar el nodo actual
+                rec->sig->ant = rec->ant;  // Conectar los nodos adyacentes
             }
-            return 1;
+
+            // Liberar memoria del nodo eliminado
+            free(rec->datosPersona->nombreApellido);
+            free(rec->datosPersona->rut);
+            free(rec->datosPersona);
+            free(rec);
+
+            return 1;  // Éxito
         }
-        ant = rec;
         rec = rec->sig;
     } while (rec != *head);
 
-    return 0;
+    return 0;  // Rut no encontrado
 }
+
 void mostrarCiudadanos(struct nodoPersona *head) {
     struct nodoPersona *rec ;
     if (head == NULL) {
