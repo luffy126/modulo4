@@ -1303,6 +1303,8 @@ void mostrarParlamentarios(struct CongresoNacional *congreso) {
     }
 }
 
+
+
 void agregarDatosParlamentario(struct Estado *es){
     int opcion, salida = 0;
     int idFalso = -22;
@@ -1450,6 +1452,17 @@ void mostrarCiudadanos(struct nodoPersona *head) {
     printf("\n\n");
 }
 
+struct Articulo *buscarArticulo(struct Articulo **articulos, int numArticulos, int numeroArticulo) {
+    // Buscar un artículo por su número en el arreglo de artículos
+    int i;
+    for (i = 0; i < numArticulos; i++) {
+        if (articulos[i] != NULL && articulos[i]->num == numeroArticulo) {
+            return articulos[i];  // Retorna el artículo si se encuentra
+        }
+    }
+    return NULL;  // Retorna NULL si no se encuentra
+}
+
 void agregarDatosCiudadanos(struct Estado *es) {
     struct Persona *nuevaPersona;
     int salida =0,opcion;
@@ -1513,8 +1526,11 @@ void agregarDatosCiudadanos(struct Estado *es) {
 }
 
 int main(){
-    int opcion;
+    int opcion, articuloBuscado, numeroArticulo;
     struct Estado *es;
+    struct ProyectoLey *proyecto;
+    struct Articulo *articulo;
+    int idProyecto;
     es= (struct Estado*)malloc(sizeof(struct Estado));
     es->congreso= (struct CongresoNacional *) malloc(sizeof(struct CongresoNacional));
     es->congreso->ley = NULL;
@@ -1533,6 +1549,7 @@ int main(){
         printf("4. Menu Clientes\n");
         printf("5. Menu Votacion Proyecto De Ley\n");
         printf("6. Introducir Presidente\n");
+        printf("7. Buscar Articulo\n");
         printf("0. Salir\n");
         printf("Ingrese opcion: \n");
         scanf("%d", &opcion);
@@ -1573,6 +1590,31 @@ int main(){
                 printf("\nSelecciono Introducir Presidente\n\n");
                 printf("Ingrese los datos\n");
                 es->presidente->datosPresidente = datosPersona(es);
+                printf("\n\n");
+                break;
+            }
+            case 7: {
+                printf("\nSeleccionaste la opción 7 Buscar Artículo en Proyecto de Ley\n\n");
+                printf("Ingrese el ID del Proyecto de Ley:\n");
+                scanf("%d", &idProyecto);
+
+                // Verificar si el proyecto existe
+                proyecto = proyectoVotando(es->congreso->ley, idProyecto);
+                if (proyecto == NULL) {
+                    printf("El proyecto de ley con ID %d no existe.\n", idProyecto);
+                } else {
+                    printf("Ingrese el número del artículo a buscar:\n");
+                    scanf("%d", &numeroArticulo);
+
+                    // Buscar el artículo en el proyecto
+                    articulo = buscarArticulo(proyecto->articulos, MaxCantidadArticulos, numeroArticulo);
+                    if (articulo != NULL) {
+                        printf("Artículo encontrado:\n");
+                        printf("Número: %d\nDescripción: %s\n", articulo->num, articulo->descripcion);
+                    } else {
+                        printf("Artículo con número %d no encontrado en el proyecto de ley.\n", numeroArticulo);
+                    }
+                }
                 printf("\n\n");
                 break;
             }
