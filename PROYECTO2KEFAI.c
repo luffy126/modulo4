@@ -97,13 +97,8 @@ struct nodoVoto {
 };
 
 struct Grafo {
-    int numVertices; // vertices
-    struct nodoGrafo **adyacencia; // l. de adyacencia
-};
-
-struct nodoGrafo {
-    int destino; // vertice destino
-    struct nodoGrafo *sig; // siguiente nodo
+    int numVertices; // vértices
+    int **adyacencia; // m. de adyacencia
 };
 
 void ordenamientoShell(int numArticulos, struct Articulo **articulos) {
@@ -750,18 +745,77 @@ void asignarComision(struct ProyectoLey *proyecto,struct nodoParlamentario *head
     }
 }
 
+void listarComision(struct Comision *comision) {
+struct nodoParlamentario *miembro;
+    if (comision == NULL) {
+        printf("No hay comisión registrada.\n");
+        return;
+    }
+    printf("Comisión Tipo: %s, Tipo de Comisión: %s\n", 
+        comision->tipo, 
+        comision->tipoComision);
+    miembro = comision->miembros;
+    printf("Miembros:\n");
+    while (miembro != NULL) {
+        printf(" - %s (ID: %d)\n", 
+            miembro->datosParlamentario->datos->nombreApellido, 
+            miembro->datosParlamentario->idParlamentario);
+        miembro = miembro->sig;
+    }
+}
+
+void eliminarComision(struct ProyectoLey *proyecto) {
+    if (proyecto->comision == NULL) {
+        printf("El proyecto no tiene una comisión asignada.\n");
+        return;
+    }
+    free(proyecto->comision->tipo);
+    free(proyecto->comision->tipoComision);
+    free(proyecto->comision);
+    proyecto->comision = NULL;
+    printf("Comisión eliminada exitosamente.\n");
+}
 
 void agregarComision(struct ProyectoLey *proyecto, struct nodoParlamentario *head) {
     struct Comision *Nueva;
+    int opcion, salir = 0;
 
-    if(head!=NULL) {
-        Nueva = (struct Comision *) malloc(sizeof (struct Comision));
-        Nueva->miembros = NULL;
-        Nueva->tipo = (char *) malloc(strlen(proyecto->tipo)*sizeof(char));
-        strcpy(Nueva->tipo,proyecto->tipo);
-        printf("El proyecto es derivado a una Comision permanente");
-        asignarComision(proyecto,head,Nueva);
-    }
+    do {
+        printf("Menu comisión\n"); 
+        printf("1: Agregar Comisión\n");
+        printf("2: Ver Comisión Proyecto\n");
+        printf("3: Eliminar Comisión\n");
+        printf("4: Salir\n");
+        scanf("%d", &opcion);
+
+        switch (opcion) {
+            case 1: {
+                if(head!=NULL) {
+                    Nueva = (struct Comision *) malloc(sizeof (struct Comision));
+                    Nueva->miembros = NULL;
+                    Nueva->tipo = (char *) malloc(strlen(proyecto->tipo)*sizeof(char));
+                    strcpy(Nueva->tipo,proyecto->tipo);
+                    printf("El proyecto es derivado a una Comision permanente");
+                    asignarComision(proyecto,head,Nueva);
+                }
+            }
+            case 2: {
+                listarComision(Nueva);
+                break;
+            }
+            case 3: {
+                eliminarComision(proyecto);
+                break;
+            }
+            case 4: {
+                printf("Saliendo del menu...\n");
+                salir = 1;
+                break;
+            }
+            default:
+                printf("Ingrese una opción válida\n");
+        }
+    } while (salir != 1);
 }
 
 void votacionEnProceso(struct ProyectoLey *proyecto,struct nodoParlamentario *head,char *camara) {
@@ -880,7 +934,7 @@ void votarProyecto(struct ProyectoLey *proyecto,struct CongresoNacional *congres
     if(strcmp(proyecto->camaraOrigen,"S")==0){
 
         strcpy(camara,"Senadores");
-        agregarComision(proyecto,congreso->senadores);
+        agregarComision(proyecto,congreso->senadores); // menu comision
         votacionEnProceso(proyecto,congreso->senadores,camara);
 
         if((( 2*congreso->numSenadores ) / 3) <= votosCamara(proyecto,congreso->senadores)){ // Votos de la Camara de Senadores
@@ -906,7 +960,7 @@ void votarProyecto(struct ProyectoLey *proyecto,struct CongresoNacional *congres
     }else {
 
         strcpy(camara,"Diputados");
-        agregarComision(proyecto,congreso->diputados);
+        agregarComision(proyecto,congreso->diputados); // menu comision
         votacionEnProceso(proyecto,congreso->diputados,camara);
 
         if(((2*congreso->numDiputados ) /3) <= votosCamara(proyecto,congreso->diputados)) { // Votos de la Camara de Diputados
@@ -1337,43 +1391,42 @@ void mostrarParlamentarios(struct CongresoNacional *congreso) {
     }
 }
 
-struct Grafo *crearGrafo(int vertices) { // crea el grafo
-    struct Grafo *grafo = (struct Grafo *)malloc(sizeof(struct Grafo));
+struct Grafo *crearGrafo(int vertices) {
     int i;
+    struct Grafo *grafo = (struct Grafo *)malloc(sizeof(struct Grafo));
     grafo->numVertices = vertices;
-    grafo->adyacencia = (struct nodoGrafo **)malloc(vertices * sizeof(struct nodoGrafo *));
+
+    grafo->adyacencia = (int **)malloc(vertices * sizeof(int *));
     for (i = 0; i < vertices; i++) {
-        grafo->adyacencia[i] = NULL;
+        grafo->adyacencia[i] = (int *)calloc(vertices, sizeof(int)); // iniciar con ceros
     }
+
     return grafo;
 }
 
-void agregarArista(struct Grafo *grafo, int origen, int destino) { // agrega una arista a un grafo
-    struct nodoGrafo *nuevoNodo = (struct nodoGrafo *)malloc(sizeof(struct nodoGrafo));
-    nuevoNodo->destino = destino;
-    nuevoNodo->sig = grafo->adyacencia[origen];
-    grafo->adyacencia[origen] = nuevoNodo;
 
-    nuevoNodo = (struct nodoGrafo *)malloc(sizeof(struct nodoGrafo));
-    nuevoNodo->destino = origen;
-    nuevoNodo->sig = grafo->adyacencia[destino];
-    grafo->adyacencia[destino] = nuevoNodo;
+void agregarArista(struct Grafo *grafo, int origen, int destino) {
+    if (origen >= 0 && origen < grafo->numVertices && destino >= 0 && destino < grafo->numVertices) {
+        grafo->adyacencia[origen][destino] = 1; // origen -> destino
+    } else {
+        printf("Error: índices fuera de rango.\n");
+    }
 }
 
-void imprimirGrafoGlobal(struct Grafo *grafo, struct Parlamentario **parlamentarios) { // muestra el grafo. como es de parlamentarios está enfocado a ellos
-    struct nodoGrafo *temp;
-    int i;
+void imprimirGrafoGlobal(struct Grafo *grafo, struct Parlamentario **parlamentarios) {
+    int i, j;
+    printf("Adyacencia Parlamentarios:\n");
     for (i = 0; i < grafo->numVertices; i++) {
         printf("Parlamentario %s (ID: %d): ", 
-            parlamentarios[i]->datos->nombreApellido, 
-            parlamentarios[i]->idParlamentario);
+               parlamentarios[i]->datos->nombreApellido, 
+               parlamentarios[i]->idParlamentario);
 
-        temp = grafo->adyacencia[i];
-        while (temp) {
-            printf("-> %s (ID: %d) ", 
-                parlamentarios[temp->destino]->datos->nombreApellido, 
-                parlamentarios[temp->destino]->idParlamentario);
-            temp = temp->sig;
+        for (j = 0; j < grafo->numVertices; j++) {
+            if (grafo->adyacencia[i][j]) {
+                printf("-> %s (ID: %d) ", 
+                       parlamentarios[j]->datos->nombreApellido, 
+                       parlamentarios[j]->idParlamentario);
+            }
         }
         printf("\n");
     }
@@ -1637,6 +1690,95 @@ struct Articulo *buscarArticulo(struct Articulo **articulos, int numArticulos, i
     return NULL;  // Retorna NULL si no se encuentra
 }
 
+void eliminarPresidente(struct Estado *es) {
+    if (es->presidente->datosPresidente == NULL) {
+        printf("No hay presidente registrado.\n");
+        return;
+    }
+    free(es->presidente->datosPresidente->nombreApellido);
+    free(es->presidente->datosPresidente->rut);
+    free(es->presidente->datosPresidente);
+    es->presidente->datosPresidente = NULL;
+    printf("Presidente eliminado exitosamente.\n");
+}
+
+void listarPresidente(struct Estado *es) {
+    if (es->presidente->datosPresidente == NULL) {
+        printf("No hay presidente registrado.\n");
+        return;
+    }
+    printf("Presidente: %s, RUT: %s, Edad: %d\n", 
+        es->presidente->datosPresidente->nombreApellido, 
+        es->presidente->datosPresidente->rut, 
+        es->presidente->datosPresidente->edad);
+}
+
+void agregarDatosPresidente(struct Estado *es) {
+    struct Presidente *nuevoPresidente;
+    char periodo[50];
+    int salida = 0, opcion;
+
+    do {
+        printf("Menu de Presidente:\n");
+        printf("1. Agregar presidente\n");
+        printf("2. Eliminar presidente\n");
+        printf("3. Mostrar presidente\n");
+        printf("4. Salir\n");
+        printf("Seleccione una opcion:");
+        scanf("%d", &opcion);
+
+        switch (opcion) {
+            case 1: {
+                printf("Agregar un nuevo presidente:\n");
+
+                // crear el presidente solicitando datos al usuario
+                if (es->presidente->datosPresidente != NULL) {
+                    printf("Ya hay un presidente registrado.\n");
+                    break;
+                }
+                es->presidente = (struct Presidente *)malloc(sizeof(struct Presidente));
+                nuevoPresidente->datosPresidente = datosPersona(es);
+                nuevoPresidente->proyectoLey = NULL;
+                
+                es->presidente = nuevoPresidente;
+                es->presidente->proyectoLey = NULL;
+
+                if (nuevoPresidente != NULL) {
+                    // Agregar la nueva persona a la lista de ciudadanos
+
+                    if (agregarNodoPersona(&es->ciudadanos->personas, nuevoPresidente->datosPresidente)==1) {
+                        printf("Presidente agregado exitosamente.\n");
+
+                    } else {
+                        printf("No se pudo agregar el presidente.\n");
+                    }
+                }
+                break;
+            }
+
+            case 2: {
+                eliminarPresidente(es);
+                break;
+            }
+
+            case 3: {
+                listarPresidente(es);
+                break;
+            }
+
+            case 4: {
+                salida = 1;
+                printf("Saliendo del menu de presidente.\n\n");
+                break;
+            }
+
+            default: {
+                printf("Opción no válida. Intente de nuevo.\n");
+                break;
+            }
+        } 
+    } while (salida != 1);
+}
 
 void agregarDatosCiudadanos(struct Estado *es) {
     struct Persona *nuevaPersona;
@@ -1723,7 +1865,7 @@ int main(){
         printf("3. Menu Agregar Ciudadano\n");
         printf("4. Menu Clientes\n");
         printf("5. Menu Votacion Proyecto De Ley\n");
-        printf("6. Introducir Presidente\n");
+        printf("6. Menu Presidente\n");
         printf("7. Buscar Articulo\n");
         printf("0. Salir\n");
         printf("Ingrese opcion: \n");
@@ -1762,10 +1904,8 @@ int main(){
                 break;
             }
             case 6: {
-                printf("\nSelecciono Introducir Presidente\n\n");
-                printf("Ingrese los datos\n");
-                es->presidente->datosPresidente = datosPersona(es);
-                printf("\n\n");
+                printf("\nSeleccionaste la opcion 6 Menu Presidente\n\n");
+                agregarDatosPresidente(es);
                 break;
             }
             case 7: {
