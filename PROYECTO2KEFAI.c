@@ -91,10 +91,19 @@ struct Voto {
     int votado;
 };
 
-
 struct nodoVoto {
     struct Voto *datosVoto;
     struct nodoVoto *izq, *der;
+};
+
+struct Grafo {
+    int numVertices; // vertices
+    struct nodoGrafo **adyacencia; // l. de adyacencia
+};
+
+struct nodoGrafo {
+    int destino; // vertice destino
+    struct nodoGrafo *sig; // siguiente nodo
 };
 
 struct Persona *crearPersona(char *nombre,char *Rut,int edad, int firma) {
@@ -405,8 +414,10 @@ void ingresarProyectoLey(struct Estado *es, struct nodoProyectoLey **head) {
     do {
 
         printf("Menu de Ingreso Proyecto de Ley\n");
-        printf("Opcion 1 Salir al Menu Principal\n");
-        printf("Opcion 2 Agregar nuevo Proyecto De Ley\n");
+        printf("Opcion 1: Salir al Menu Principal\n");
+        printf("Opcion 2: Agregar nuevo Proyecto De Ley\n");
+        printf("Opcion 3: Ver Proyectos de Ley\n");
+
         scanf("%d", &opcion);
 
         switch (opcion) {
@@ -618,7 +629,7 @@ int agregarVotoParlamentario(struct Parlamentario *parlamentario,struct Proyecto
 
             padre = rec;
             if(rec->datosVoto->proyecto == proyecto) {
-                // ya existe un voto para este proyecto,actualiza la decision
+                // ya existe un voto para este proyecto, actualiza la decision
                 rec->datosVoto->votado = decision;
                 return 1;
 
@@ -991,8 +1002,6 @@ void mostrarProyecto(struct ProyectoLey *proyecto) {
     for(i=0;i<MaxCantidadArticulos && proyecto->articulos[i]!=NULL;i++) {
         printf("Articulo[%d]: '%s' \n",i+1,proyecto->articulos[i]->descripcion);
     }
-
-
 }
 
 void recorrerArbolProyectos(struct nodoProyectoLey *raiz) {
@@ -1017,8 +1026,8 @@ void comienzoVotacionCongreso(struct Estado *es){
         printf("Menu de Comienzo de votaciones Congreso Nacional\n");
         printf("Opcion 1: Salir al menu Principal\n");
         printf("Opcion 2: Comenzar La votacion \n");
-        printf("Opcion 3: Mostar Los Proyectos en el Congreso\n");
-        printf("Opcion 4: Mostar Proyecto de Ley con mas Votos positivos\n");
+        printf("Opcion 3: Mostrar Los Proyectos en el Congreso\n");
+        printf("Opcion 4: Mostrar Proyecto de Ley con mas Votos positivos\n");
         scanf("%d",&opcion);
         switch (opcion){
             case 1:{
@@ -1027,7 +1036,7 @@ void comienzoVotacionCongreso(struct Estado *es){
             }
             case 2:{
                 if(es->congreso->numDiputados!=155 && es->congreso->numSenadores!=50) {
-                    printf("No puede Comenzar una Votacion porque Alguna de las Camara no esta llena\n\n");
+                    printf("No puede comenzar una votacion porque alguna de las camaras no esta llena\n\n");
 
                 }else {
                     do{
@@ -1304,7 +1313,136 @@ void mostrarParlamentarios(struct CongresoNacional *congreso) {
     }
 }
 
+struct Grafo *crearGrafo(int vertices) { // crea el grafo
+    struct Grafo *grafo = (struct Grafo *)malloc(sizeof(struct Grafo));
+    grafo->numVertices = vertices;
+    grafo->adyacencia = (struct nodoGrafo **)malloc(vertices * sizeof(struct nodoGrafo *));
+    for (int i = 0; i < vertices; i++) {
+        grafo->adyacencia[i] = NULL;
+    }
+    return grafo;
+}
 
+void agregarArista(struct Grafo *grafo, int origen, int destino) { // agrega una arista a un grafo
+    struct nodoGrafo *nuevoNodo = (struct nodoGrafo *)malloc(sizeof(struct nodoGrafo));
+    nuevoNodo->destino = destino;
+    nuevoNodo->sig = grafo->adyacencia[origen];
+    grafo->adyacencia[origen] = nuevoNodo;
+
+    nuevoNodo = (struct nodoGrafo *)malloc(sizeof(struct nodoGrafo));
+    nuevoNodo->destino = origen;
+    nuevoNodo->sig = grafo->adyacencia[destino];
+    grafo->adyacencia[destino] = nuevoNodo;
+}
+
+void imprimirGrafoGlobal(struct Grafo *grafo, struct Parlamentario **parlamentarios) { // muestra el grafo. como es de parlamentarios está enfocado a ellos
+    for (int i = 0; i < grafo->numVertices; i++) {
+        printf("Parlamentario %s (ID: %d): ", 
+            parlamentarios[i]->datos->nombreApellido, 
+            parlamentarios[i]->idParlamentario);
+
+        struct nodoGrafo *temp = grafo->adyacencia[i];
+        while (temp) {
+            printf("-> %s (ID: %d) ", 
+                parlamentarios[temp->destino]->datos->nombreApellido, 
+                parlamentarios[temp->destino]->idParlamentario);
+            temp = temp->sig;
+        }
+        printf("\n");
+    }
+}
+
+/*auxiliares*/
+
+struct ProyectoLey *buscarProyectoPorID(struct nodoProyectoLey *arbol, int id) {
+    while (arbol != NULL) {
+        if (arbol->datosProyecto->id == id) {
+            return arbol->datosProyecto; // proyecto encontrado
+        } else if (id < arbol->datosProyecto->id) {
+            arbol = arbol->izq;
+        } else {
+            arbol = arbol->der; 
+        }
+    }
+    return NULL; // proyecto no encontrado
+}
+
+int buscarProyectoEnABB (struct nodoVoto *nodo, int idProyecto) { // busca el proyecto dentro de los votos del parlamentario
+    while (nodo != NULL) {
+        if (nodo->datosVoto->proyecto->id == idProyecto) {
+            return 1; // proyecto encontrado
+        } else if (idProyecto < nodo->datosVoto->proyecto->id) {
+            nodo = nodo->izq;
+        } else {
+            nodo = nodo->der;
+        }
+    }
+    return 0; // Proyecto no encontrado
+}
+
+void mostrarProyectos(struct nodoProyectoLey *arbol) { // mostrar proyectos de ley para seleccionar
+    if (arbol == NULL) {
+        return;
+    }
+    mostrarProyectos(arbol->izq);
+    printf("ID: %d, Nombre: %s\n", arbol->datosProyecto->id, arbol->datosProyecto->nombreProyecto);
+    mostrarProyectos(arbol->der);
+}
+
+/*fin auxiliares*/
+
+void crearGrafoPorProyecto(struct CongresoNacional *congreso, int idProyecto) { // crea el grafo para un proyecto de ley
+    struct ProyectoLey *proyecto = buscarProyectoPorID(congreso->ley, idProyecto);
+    if (proyecto == NULL) {
+        printf("No se encontró un proyecto con el ID %d.\n", idProyecto);
+        return;
+    }
+
+    printf("Proyecto seleccionado: %s\n", proyecto->nombreProyecto);
+
+    struct Parlamentario *parlamentarios[205]; // máximo 155 diputados + 50 senadores
+    int totalParlamentarios = 0;
+
+    struct nodoParlamentario *rec;
+    for (rec = congreso->diputados; rec != NULL; rec = rec->sig) {
+        if (buscarProyectoEnABB(rec->datosParlamentario->votos, proyecto->id)) {
+            parlamentarios[totalParlamentarios++] = rec->datosParlamentario; // agregar diputado al arreglo
+        }
+    }
+    for (rec = congreso->senadores; rec != NULL; rec = rec->sig) {
+        if (buscarProyectoEnABB(rec->datosParlamentario->votos, proyecto->id)) {
+            parlamentarios[totalParlamentarios++] = rec->datosParlamentario; // agregar senador al arreglo
+        }
+    }
+
+    if (totalParlamentarios == 0) {
+        printf("No se encontraron parlamentarios relacionados con este proyecto.\n");
+        return;
+    }
+
+    struct Grafo *grafo = crearGrafo(totalParlamentarios); // crea el grafo con los parlamenarios relacionados
+
+    for (int i = 0; i < totalParlamentarios; i++) {
+        for (int j = i + 1; j < totalParlamentarios; j++) {
+            agregarArista(grafo, i, j); // agrega aristas entre los parlamentarios encontrados
+        }
+    }
+
+    printf("Parlamentarios relacionados al Proyecto de Ley ID %d (%s):\n", idProyecto, proyecto->nombreProyecto);
+    imprimirGrafoGlobal(grafo, parlamentarios);
+}
+
+void menuGrafoPorProyecto(struct CongresoNacional *congreso) {
+    int idProyecto;
+
+    printf("Proyectos de Ley Disponibles:\n"); // muestra los proyectos de ley para seleccionar
+    mostrarProyectos(congreso->ley);
+
+    printf("Ingrese el ID del proyecto para ver los parlamentarios relacionados: ");
+    scanf("%d", &idProyecto);
+
+    crearGrafoPorProyecto(congreso, idProyecto); // crea el grafo para el proyecto seleccionado
+}
 
 void agregarDatosParlamentario(struct Estado *es){
     int opcion, salida = 0;
@@ -1316,6 +1454,7 @@ void agregarDatosParlamentario(struct Estado *es){
         printf("Opcion 1: Salir al menu Principal\n");
         printf("Opcion 2: Modificar Parlamentarios\n");
         printf("Opcion 3: Mostrar los Parlamentarios\n");
+        printf("Opcion 4: Mostrar parlamentarios relacionados a un proyecto\n");
         scanf("%d", &opcion);
         switch (opcion) {
             case 1: {
@@ -1394,6 +1533,12 @@ void agregarDatosParlamentario(struct Estado *es){
                 break;
 
             }
+
+            case 4: {
+                menuGrafoPorProyecto(es);
+                break;
+            }
+
             default: {
                 printf("Ingrese una opcion valida\n");
                 break;
@@ -1580,7 +1725,7 @@ int main(){
         scanf("%d", &opcion);
         switch (opcion) {
             case 0:{
-                printf("Saliendo\n");
+                printf("Saliendo...\n");
                 break;
             }
             case 1: {
