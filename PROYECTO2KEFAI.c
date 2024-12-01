@@ -106,6 +106,30 @@ struct nodoGrafo {
     struct nodoGrafo *sig; // siguiente nodo
 };
 
+void ordenamientoShell(int numArticulos, struct Articulo **articulos) {
+    struct Articulo *temp;
+    int i, j, k;
+    
+    // iniciar salto
+    k = numArticulos / 2;
+    
+    while (k >= 1) {
+        for (i = k; i < numArticulos; i++) { // recorrer los elementos desde el salto k
+            temp = articulos[i];
+            j = i - k;
+            
+            while (j >= 0 && articulos[j]->num > temp->num) { // mover elementos mayores que temp a la derecha
+                articulos[j + k] = articulos[j];
+                j = j - k;
+            }
+            
+            articulos[j + k] = temp; // insertar elemento en su posición correcta
+        } 
+        
+        k = k / 2; // reducir el salto
+    }
+}
+
 struct Persona *crearPersona(char *nombre,char *Rut,int edad, int firma) {
     struct Persona *nuevaPersona;
     nuevaPersona = (struct Persona *) malloc(sizeof(struct Persona));
@@ -480,7 +504,7 @@ void ingresarProyectoLey(struct Estado *es, struct nodoProyectoLey **head) {
                     scanf(" %[^\n]", ArticuloDescripcion);
                     Articulos[i] = crearArticulo(i+1,ArticuloDescripcion);
                     printf("Si desea salir, ingrese 1 si no, ingrese 0: ");
-                    ordenamientoShell(Articulos, i);
+                    ordenamientoShell(i, Articulos);
                     scanf("%d", &salida);
 
                 }
@@ -1315,9 +1339,10 @@ void mostrarParlamentarios(struct CongresoNacional *congreso) {
 
 struct Grafo *crearGrafo(int vertices) { // crea el grafo
     struct Grafo *grafo = (struct Grafo *)malloc(sizeof(struct Grafo));
+    int i;
     grafo->numVertices = vertices;
     grafo->adyacencia = (struct nodoGrafo **)malloc(vertices * sizeof(struct nodoGrafo *));
-    for (int i = 0; i < vertices; i++) {
+    for (i = 0; i < vertices; i++) {
         grafo->adyacencia[i] = NULL;
     }
     return grafo;
@@ -1336,12 +1361,14 @@ void agregarArista(struct Grafo *grafo, int origen, int destino) { // agrega una
 }
 
 void imprimirGrafoGlobal(struct Grafo *grafo, struct Parlamentario **parlamentarios) { // muestra el grafo. como es de parlamentarios está enfocado a ellos
-    for (int i = 0; i < grafo->numVertices; i++) {
+    struct nodoGrafo *temp;
+    int i;
+    for (i = 0; i < grafo->numVertices; i++) {
         printf("Parlamentario %s (ID: %d): ", 
             parlamentarios[i]->datos->nombreApellido, 
             parlamentarios[i]->idParlamentario);
 
-        struct nodoGrafo *temp = grafo->adyacencia[i];
+        temp = grafo->adyacencia[i];
         while (temp) {
             printf("-> %s (ID: %d) ", 
                 parlamentarios[temp->destino]->datos->nombreApellido, 
@@ -1392,7 +1419,12 @@ void mostrarProyectos(struct nodoProyectoLey *arbol) { // mostrar proyectos de l
 /*fin auxiliares*/
 
 void crearGrafoPorProyecto(struct CongresoNacional *congreso, int idProyecto) { // crea el grafo para un proyecto de ley
+    struct Parlamentario *parlamentarios[205]; // máximo 155 diputados + 50 senadores
+    struct nodoParlamentario *rec;
+    struct Grafo *grafo;
+    int totalParlamentarios = 0;
     struct ProyectoLey *proyecto = buscarProyectoPorID(congreso->ley, idProyecto);
+    int i, j;
     if (proyecto == NULL) {
         printf("No se encontró un proyecto con el ID %d.\n", idProyecto);
         return;
@@ -1400,10 +1432,6 @@ void crearGrafoPorProyecto(struct CongresoNacional *congreso, int idProyecto) { 
 
     printf("Proyecto seleccionado: %s\n", proyecto->nombreProyecto);
 
-    struct Parlamentario *parlamentarios[205]; // máximo 155 diputados + 50 senadores
-    int totalParlamentarios = 0;
-
-    struct nodoParlamentario *rec;
     for (rec = congreso->diputados; rec != NULL; rec = rec->sig) {
         if (buscarProyectoEnABB(rec->datosParlamentario->votos, proyecto->id)) {
             parlamentarios[totalParlamentarios++] = rec->datosParlamentario; // agregar diputado al arreglo
@@ -1420,10 +1448,10 @@ void crearGrafoPorProyecto(struct CongresoNacional *congreso, int idProyecto) { 
         return;
     }
 
-    struct Grafo *grafo = crearGrafo(totalParlamentarios); // crea el grafo con los parlamenarios relacionados
+    grafo = crearGrafo(totalParlamentarios); // crea el grafo con los parlamenarios relacionados
 
-    for (int i = 0; i < totalParlamentarios; i++) {
-        for (int j = i + 1; j < totalParlamentarios; j++) {
+    for (i = 0; i < totalParlamentarios; i++) {
+        for (j = i + 1; j < totalParlamentarios; j++) {
             agregarArista(grafo, i, j); // agrega aristas entre los parlamentarios encontrados
         }
     }
@@ -1535,7 +1563,7 @@ void agregarDatosParlamentario(struct Estado *es){
             }
 
             case 4: {
-                menuGrafoPorProyecto(es);
+                menuGrafoPorProyecto(es->congreso);
                 break;
             }
 
@@ -1609,29 +1637,6 @@ struct Articulo *buscarArticulo(struct Articulo **articulos, int numArticulos, i
     return NULL;  // Retorna NULL si no se encuentra
 }
 
-void ordenamientoShell(int numArticulos, struct Articulo **articulos) {
-    int i, j, k;
-    struct Articulo *temp;
-    
-    // iniciar salto
-    k = numArticulos / 2;
-    
-    while (k >= 1) {
-        for (i = k; i < numArticulos; i++) { // recorrer los elementos desde el salto k
-            temp = articulos[i];
-            j = i - k;
-            
-            while (j >= 0 && articulos[j]->num > temp->num) { // mover elementos mayores que temp a la derecha
-                articulos[j + k] = articulos[j];
-                j = j - k;
-            }
-            
-            articulos[j + k] = temp; // insertar elemento en su posición correcta
-        } 
-        
-        k = k / 2; // reducir el salto
-    }
-}
 
 void agregarDatosCiudadanos(struct Estado *es) {
     struct Persona *nuevaPersona;
